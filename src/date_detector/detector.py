@@ -7,6 +7,8 @@ Entry = namedtuple('Entry', 'token year month day')
 
 Candidate = namedtuple('Candidate', 'year month day')
 
+EMPTY_CANDIDATE = Candidate(None, None, None)
+
 Token = namedtuple('Token', 'start end type')
 
 
@@ -69,10 +71,10 @@ class Parser(object):
         candidates = None
         seq_start = seq_end = 0
         for token in self.tokenizer.tokenize(text):
-            print
+            # print
             # Look for the token text in the dictionaries
             token_text = self._extract_token(text, token)
-            print '"%s"' % token_text, token
+            # print '"%s"' % token_text, token
             entry = self.entries.get(token_text)
             if entry is None:
                 # Token not identified, end of current token sequence (if any)
@@ -85,7 +87,7 @@ class Parser(object):
                 if not candidates:
                     if not (entry.year or entry.month or entry.day):
                         continue
-                    candidates = [Candidate(None, None, None)]
+                    candidates = [EMPTY_CANDIDATE]
                     seq_start = token.start
                 # Add the token to the current sequence
                 candidates = self._extend(candidates, entry)
@@ -110,23 +112,29 @@ class Parser(object):
 
     def _extend(self, candidates, entry):
         new_candidates = []
-        if entry.month and entry.day:
-            if self.month_before_day:
-                if not any((c.month for c in candidates)):
-                    new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates))
-                new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates))
-            else:
-                new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates))
-                if not any((c.day for c in candidates)):
-                    new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates))
-        elif entry.month:
-            new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates))
-        elif entry.day:
-            new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates))
         if entry.year:
-            new_candidates.extend((Candidate(entry.year, c.month, c.day) for c in candidates))
-        for c in new_candidates: print c
+            # Create new candidates by filling their year field
+            new_candidates.extend((Candidate(entry.year, c.month, c.day) for c in candidates if not c.year))
+        if entry.month and entry.day and self._candidates_are_empty(candidates):
+            # Ambiguous entry that appears at the beginning of the sequence
+            if self.month_before_day:
+                new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates))
+            else:
+                new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates))
+            return new_candidates or candidates
+        if entry.month:
+            # Create new candidates by filling their month field
+            new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates if not c.month))
+        if entry.day:
+            # Create new candidates by filling their day field, unless there is already
+            # a year and no month - because usually the day does not appear immediately after the year
+            new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates
+                                  if not c.day and not (c.year and not c.month)))
+        # for c in new_candidates: print c
         return new_candidates or candidates
+
+    def _candidates_are_empty(self, candidates):
+        return candidates == [EMPTY_CANDIDATE]
 
     def _build_matches(self, text, start, end, candidates):
         matches = set()
