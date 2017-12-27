@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 from collections import namedtuple
 from datetime import date, datetime
 
@@ -108,10 +110,8 @@ class Parser(object):
     def parse(self, text):
         seq = Sequence(text)
         for token in self.tokenizer.tokenize(text):
-            print
             # Look for the token text in the dictionaries
             token_text = self._extract_token(text, token)
-            print '"%s"' % token_text, token
             entry = self.entries.get(token_text)
             if entry is None:
                 # Token not identified, end of current token sequence (if any)
@@ -167,32 +167,29 @@ class Parser(object):
         matches = set()
         if seq.is_full():
             candidates = self._digits_candidates(seq) if seq.is_all_digits() else self._mixed_candidates(seq)
-            for c in candidates:
+            for candidate in candidates:
                 try:
-                    d = date(c.year, c.month, c.day)
-                    matches.add(Match(date=d, offset=seq.get_start(), text=unicode(seq)))
-                    print c
-                except:
+                    d = date(*candidate)
+                    matches.add(Match(date=d, offset=seq.get_start(), text=str(seq)))
+                except Exception as e:
                     pass
         return matches
 
     def _digits_candidates(self, seq):
-        text = `seq`
-        print 'PARSE "%s"' % text
+        text = repr(seq)
         formats = FORMATS_WITH_MDY if self.month_before_day else FORMATS_WITH_DMY
         candidates = []
         for f in formats:
             try:
                 d = datetime.strptime(text, f)
                 candidates.append(Candidate(d.year, d.month, d.day))
-            except:
+            except Exception as e:
                 pass
         return candidates
 
     def _mixed_candidates(self, seq):
         candidates = [Candidate(None, None, None)]
         for entry in seq:
-            print 'ADD ', entry
             candidates = self._extend(candidates, entry)
         return candidates
 
@@ -217,16 +214,16 @@ class Parser(object):
         for n in range(1, 4):
             self._add_to_dictionary(' ' * n)
         # Years
-        for year in xrange(self.min_year, self.max_year + 1):
+        for year in range(self.min_year, self.max_year + 1):
             self._add_to_dictionary(str(year), year=year)
             self._add_to_dictionary(str(year)[2:], year=year)
         # Months
-        for month in xrange(1, 13):
+        for month in range(1, 13):
             self._add_to_dictionary(str(month), month=month)
             if month < 10:
                 self._add_to_dictionary('0' + str(month), month=month)
         # Days
-        for day in xrange(1, 32):
+        for day in range(1, 32):
             self._add_to_dictionary(str(day), day=day)
             if day < 10:
                 self._add_to_dictionary('0' + str(day), day=day)
@@ -248,5 +245,3 @@ class Parser(object):
                 None if parts[2] == '-' else int(parts[2]),
                 None if parts[3] == '-' else int(parts[3])
             )
-
-

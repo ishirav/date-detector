@@ -6,8 +6,7 @@ class ParserTest(TestCase):
 
     def _check(self, parser, text, dates):
         matches = parser.parse(text)
-        self.assertEquals(set([m.date.isoformat() for m in matches]), set(dates))
-        print 'OK'
+        self.assertEqual(set([m.date.isoformat() for m in matches]), set(dates))
 
     def test_ymd(self):
         for month_before_day in (True, False):
