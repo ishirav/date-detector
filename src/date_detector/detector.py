@@ -1,13 +1,16 @@
 from collections import namedtuple
-from datetime import date
+from datetime import date, datetime
+
+
+# Formats for parsing dates the contain only digits
+FORMATS_WITH_DMY = ['%Y/%m/%d', '%y/%m/%d', '%d/%m/%Y', '%d/%m/%y']
+FORMATS_WITH_MDY = ['%Y/%m/%d', '%y/%m/%d', '%m/%d/%Y', '%m/%d/%y']
 
 Match = namedtuple('Match', 'date offset text')
 
-Entry = namedtuple('Entry', 'token year month day')
+Entry = namedtuple('Entry', 'year month day token')
 
 Candidate = namedtuple('Candidate', 'year month day')
-
-EMPTY_CANDIDATE = Candidate(None, None, None)
 
 Token = namedtuple('Token', 'start end type')
 
@@ -53,6 +56,41 @@ class Tokenizer(object):
         return self.OTHER
 
 
+class Sequence(object):
+    '''
+    Holds a sequence of tokens and their matching dictionary entries.
+    '''
+
+    def __init__(self, text):
+        self.text = text
+        self.tokens = []
+        self.entries = []
+
+    def __unicode__(self):
+        return self.text[self.get_start() : self.get_end()]
+
+    def __repr__(self):
+        return '/'.join([self.text[t.start : t.end] for t in self.tokens])
+
+    def __iter__(self):
+        return iter(self.entries)
+
+    def add(self, token, entry):
+        self.tokens.append(token)
+        self.entries.append(entry)
+
+    def is_all_digits(self):
+        return all((t.type == Tokenizer.DIGITS for t in self.tokens))
+
+    def is_full(self):
+        return len(self.tokens) == 3
+
+    def get_start(self):
+        return self.tokens[0].start
+
+    def get_end(self):
+        return self.tokens[-1].end
+
 
 class Parser(object):
 
@@ -68,44 +106,46 @@ class Parser(object):
             self._load_dictionary(d)
 
     def parse(self, text):
-        candidates = None
-        seq_start = seq_end = 0
+        seq = Sequence(text)
         for token in self.tokenizer.tokenize(text):
-            # print
+            print
             # Look for the token text in the dictionaries
             token_text = self._extract_token(text, token)
-            # print '"%s"' % token_text, token
+            print '"%s"' % token_text, token
             entry = self.entries.get(token_text)
             if entry is None:
                 # Token not identified, end of current token sequence (if any)
-                if candidates:
-                    for match in self._build_matches(text, seq_start, seq_end, candidates):
-                        yield match
-                    candidates = None
+                for match in self._build_matches(seq):
+                    yield match
+                seq = Sequence(text)
             else:
-                # Is it a new sequence?
-                if not candidates:
-                    if not (entry.year or entry.month or entry.day):
-                        continue
-                    candidates = [EMPTY_CANDIDATE]
-                    seq_start = token.start
+                # Should this token be skipped?
+                if not (entry.year or entry.month or entry.day):
+                    continue
                 # Add the token to the current sequence
-                candidates = self._extend(candidates, entry)
-                seq_end = token.end
-                # Check if there are any candidates that have year, month and day
-                matches = self._build_matches(text, seq_start, seq_end, candidates)
-                if matches:
-                    for match in matches:
+                seq.add(token, entry)
+                # End the sequence if it is full
+                if seq.is_full():
+                    for match in self._build_matches(seq):
                         yield match
-                    candidates = None
+                    seq = Sequence(text)
         # Yield any remaining matches
-        for match in self._build_matches(text, seq_start, seq_end, candidates):
+        for match in self._build_matches(seq):
             yield match
 
     def _extract_token(self, text, token):
+        '''
+        Extracts the token from the text and preprocesses it:
+        - DIGITS remain the same
+        - LETTERS are converted to lowercase
+        - WHITESPACE of any kind is converted to blanks
+        - OTHER is stripped of whitespace
+        '''
         token_text = text[token.start: token.end]
         if token.type == Tokenizer.LETTERS:
             token_text = token_text.lower()
+        elif token.type == Tokenizer.WHITESPACE:
+            token_text = ' ' * len(token_text)
         elif token.type == Tokenizer.OTHER:
             token_text = token_text.strip()
         return token_text
@@ -114,52 +154,60 @@ class Parser(object):
         new_candidates = []
         if entry.year:
             # Create new candidates by filling their year field
-            new_candidates.extend((Candidate(entry.year, c.month, c.day) for c in candidates if not c.year))
-        if entry.month and entry.day and self._candidates_are_empty(candidates):
-            # Ambiguous entry that appears at the beginning of the sequence
-            if self.month_before_day:
-                new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates))
-            else:
-                new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates))
-            return new_candidates or candidates
+            new_candidates.extend([Candidate(entry.year, c.month, c.day) for c in candidates if not c.year])
         if entry.month:
             # Create new candidates by filling their month field
-            new_candidates.extend((Candidate(c.year, entry.month, c.day) for c in candidates if not c.month))
+            new_candidates.extend([Candidate(c.year, entry.month, c.day) for c in candidates if not c.month])
         if entry.day:
-            # Create new candidates by filling their day field, unless there is already
-            # a year and no month - because usually the day does not appear immediately after the year
-            new_candidates.extend((Candidate(c.year, c.month, entry.day) for c in candidates
-                                  if not c.day and not (c.year and not c.month)))
-        # for c in new_candidates: print c
-        return new_candidates or candidates
+            # Create new candidates by filling their day field
+            new_candidates.extend([Candidate(c.year, c.month, entry.day) for c in candidates if not c.day])
+        return new_candidates
 
-    def _candidates_are_empty(self, candidates):
-        return candidates == [EMPTY_CANDIDATE]
-
-    def _build_matches(self, text, start, end, candidates):
+    def _build_matches(self, seq):
         matches = set()
-        if candidates:
+        if seq.is_full():
+            candidates = self._digits_candidates(seq) if seq.is_all_digits() else self._mixed_candidates(seq)
             for c in candidates:
-                if c.year and c.month and c.day:
-                    matches.add(Match(
-                        date=date(c.year, c.month, c.day),
-                        offset=start,
-                        text=text[start : end]
-                    ))
+                try:
+                    d = date(c.year, c.month, c.day)
+                    matches.add(Match(date=d, offset=seq.get_start(), text=unicode(seq)))
+                    print c
+                except:
+                    pass
         return matches
+
+    def _digits_candidates(self, seq):
+        text = `seq`
+        print 'PARSE "%s"' % text
+        formats = FORMATS_WITH_MDY if self.month_before_day else FORMATS_WITH_DMY
+        candidates = []
+        for f in formats:
+            try:
+                d = datetime.strptime(text, f)
+                candidates.append(Candidate(d.year, d.month, d.day))
+            except:
+                pass
+        return candidates
+
+    def _mixed_candidates(self, seq):
+        candidates = [Candidate(None, None, None)]
+        for entry in seq:
+            print 'ADD ', entry
+            candidates = self._extend(candidates, entry)
+        return candidates
 
     def _add_to_dictionary(self, token, year=None, month=None, day=None):
         token = token.lower()
         old_entry = self.entries.get(token)
         if old_entry:
             entry = Entry(
-                token,
                 year or old_entry.year,
                 month or old_entry.month,
-                day or old_entry.day
+                day or old_entry.day,
+                token
             )
         else:
-            entry = Entry(token, year, month, day)
+            entry = Entry(year, month, day, token)
         self.entries[token] = entry
 
     def _build_default_dictionary(self):
