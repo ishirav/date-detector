@@ -24,6 +24,8 @@ class Tokenizer(object):
     WHITESPACE  = 'W'
     OTHER       = 'O'
 
+    WHITESPACE_CHARS = ' \t\n\r'.encode('ascii')
+
     def tokenize(self, text):
         token_start = token_end = 0
         token_type = None
@@ -53,7 +55,7 @@ class Tokenizer(object):
             return self.DIGITS
         if char.isalpha():
             return self.LETTERS
-        if char in (' \t\n\r'):
+        if char in self.WHITESPACE_CHARS:
             return self.WHITESPACE
         return self.OTHER
 
@@ -67,9 +69,6 @@ class Sequence(object):
         self.text = text
         self.tokens = []
         self.entries = []
-
-    def __unicode__(self):
-        return self.text[self.get_start() : self.get_end()]
 
     def __repr__(self):
         return '/'.join([self.text[t.start : t.end] for t in self.tokens])
@@ -92,6 +91,9 @@ class Sequence(object):
 
     def get_end(self):
         return self.tokens[-1].end
+
+    def get_text(self):
+        return self.text[self.get_start() : self.get_end()]
 
 
 class Parser(object):
@@ -150,19 +152,6 @@ class Parser(object):
             token_text = token_text.strip()
         return token_text
 
-    def _extend(self, candidates, entry):
-        new_candidates = []
-        if entry.year:
-            # Create new candidates by filling their year field
-            new_candidates.extend([Candidate(entry.year, c.month, c.day) for c in candidates if not c.year])
-        if entry.month:
-            # Create new candidates by filling their month field
-            new_candidates.extend([Candidate(c.year, entry.month, c.day) for c in candidates if not c.month])
-        if entry.day:
-            # Create new candidates by filling their day field
-            new_candidates.extend([Candidate(c.year, c.month, entry.day) for c in candidates if not c.day])
-        return new_candidates
-
     def _build_matches(self, seq):
         matches = set()
         if seq.is_full():
@@ -170,8 +159,8 @@ class Parser(object):
             for candidate in candidates:
                 try:
                     d = date(*candidate)
-                    matches.add(Match(date=d, offset=seq.get_start(), text=str(seq)))
-                except Exception as e:
+                    matches.add(Match(date=d, offset=seq.get_start(), text=seq.get_text()))
+                except ValueError:
                     pass
         return matches
 
@@ -192,6 +181,19 @@ class Parser(object):
         for entry in seq:
             candidates = self._extend(candidates, entry)
         return candidates
+
+    def _extend(self, candidates, entry):
+        new_candidates = []
+        if entry.year:
+            # Create new candidates by filling their year field
+            new_candidates.extend([Candidate(entry.year, c.month, c.day) for c in candidates if not c.year])
+        if entry.month:
+            # Create new candidates by filling their month field
+            new_candidates.extend([Candidate(c.year, entry.month, c.day) for c in candidates if not c.month])
+        if entry.day:
+            # Create new candidates by filling their day field
+            new_candidates.extend([Candidate(c.year, c.month, entry.day) for c in candidates if not c.day])
+        return new_candidates
 
     def _add_to_dictionary(self, token, year=None, month=None, day=None):
         token = token.lower()
@@ -231,7 +233,6 @@ class Parser(object):
     def _load_dictionary(self, name):
         from pkgutil import get_data
         text = get_data('date_detector', 'dictionaries/%s.txt' % name)
-        if not text: return # FIXME
         for line in text.decode('utf-8').splitlines():
             line = line.strip()
             if not line or line[0] == '#':

@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 from unittest import TestCase
 
 from date_detector import Parser
@@ -37,6 +40,15 @@ class ParserTest(TestCase):
             self._check(p, 'October 9th, 2017', ['2017-10-09'])
             self._check(p, '9 October, 2017', ['2017-10-09'])
             self._check(p, '2017 October 9', ['2017-10-09'])
+
+    def test_hebrew(self):
+        p = Parser(dictionaries=('en', 'he'))
+        self._check(p, 'אוקטובר 9, 2017', ['2017-10-09'])
+        self._check(p, '9 אוקטובר 2017', ['2017-10-09'])
+        self._check(p, 'ה-9 לאוקטובר, 2017', ['2017-10-09'])
+        self._check(p, 'ה-9 באוקטובר, 2017', ['2017-10-09'])
+        self._check(p, '2017-אוק-09', ['2017-10-09'])
+        self._check(p, '2017 אוקטובר 9', ['2017-10-09'])
 
     def test_invalid_dates(self):
         for month_before_day in (True, False):
