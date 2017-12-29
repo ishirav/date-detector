@@ -23,3 +23,6 @@ class TokenizerTest(TestCase):
         self.assertEqual(self._get_token_types('   '), 'W')
         self.assertEqual(self._get_token_types(' . '), 'O')
         self.assertEqual(self._get_token_types(' 1. '), 'WDO')
+
+    def test_empty(self):
+        self._verify('', '')

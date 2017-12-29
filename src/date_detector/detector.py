@@ -4,9 +4,13 @@ from collections import namedtuple
 from datetime import date, datetime
 
 
-# Formats for parsing dates the contain only digits
+# Formats for parsing dates that contain only digits
 FORMATS_WITH_DMY = ['%Y/%m/%d', '%y/%m/%d', '%d/%m/%Y', '%d/%m/%y']
 FORMATS_WITH_MDY = ['%Y/%m/%d', '%y/%m/%d', '%m/%d/%Y', '%m/%d/%y']
+
+# Acceptable range of dates
+DEFAULT_MIN_DATE = date(1950, 1, 1)
+DEFAULT_MAX_DATE = date(2049, 12, 31)
 
 Match = namedtuple('Match', 'date offset text')
 
@@ -18,15 +22,27 @@ Token = namedtuple('Token', 'start end type')
 
 
 class Tokenizer(object):
+    '''
+    Breaks text into a sequence of consecutive tokens. Each token
+    has a type, which can be digits, letters, whitespace or other.
+    The "whitespace" token type is a pure sequence of whitespace
+    characters, while "other" can contain a mixture of punctuation,
+    whitespace, and any other non-alphanumeric characters.
+    '''
 
+    # Token types
     DIGITS      = 'D'
     LETTERS     = 'L'
     WHITESPACE  = 'W'
     OTHER       = 'O'
 
+    # Characters that are considered whitespace
     WHITESPACE_CHARS = ' \t\n\r'.encode('ascii')
 
     def tokenize(self, text):
+        '''
+        Returns a generator of Token instances found in the text.
+        '''
         token_start = token_end = 0
         token_type = None
         for char in text:
@@ -51,6 +67,9 @@ class Tokenizer(object):
             yield Token(token_start, token_end, token_type)
 
     def _char_type(self, char):
+        '''
+        Determines the type of the given character.
+        '''
         if char.isdigit():
             return self.DIGITS
         if char.isalpha():
@@ -99,10 +118,10 @@ class Sequence(object):
 class Parser(object):
 
     def __init__(self, dictionaries=('en',), month_before_day=False,
-                 min_year=1950, max_year=2050, tokenizer_class=Tokenizer):
+                 min_date=DEFAULT_MIN_DATE, max_date=DEFAULT_MAX_DATE, tokenizer_class=Tokenizer):
         self.month_before_day = month_before_day
-        self.min_year = min_year
-        self.max_year = max_year
+        self.min_date = min_date
+        self.max_date = max_date
         self.tokenizer = tokenizer_class()
         self.entries = {}
         self._build_default_dictionary()
@@ -170,8 +189,9 @@ class Parser(object):
         candidates = []
         for f in formats:
             try:
-                d = datetime.strptime(text, f)
-                candidates.append(Candidate(d.year, d.month, d.day))
+                d = datetime.strptime(text, f).date()
+                if self.min_date <= d <= self.max_date:
+                    candidates.append(Candidate(d.year, d.month, d.day))
             except Exception as e:
                 pass
         return candidates
@@ -216,7 +236,7 @@ class Parser(object):
         for n in range(1, 4):
             self._add_to_dictionary(' ' * n)
         # Years
-        for year in range(self.min_year, self.max_year + 1):
+        for year in range(self.min_date.year, self.max_date.year + 1):
             self._add_to_dictionary(str(year), year=year)
             self._add_to_dictionary(str(year)[2:], year=year)
         # Months

@@ -55,3 +55,10 @@ class ParserTest(TestCase):
             p = Parser(month_before_day=month_before_day)
             for d in ['29/2/2017', '2/29/2017', 'May 35, 1970', '20/30/40', 'June 1985']:
                 self._check(p, d, [])
+
+    def test_out_of_range(self):
+        p = Parser()
+        self._check(p, '2049-12-31', ['2049-12-31'])
+        self._check(p, '2050-01-01', [])
+        self._check(p, '1950-01-01', ['1950-01-01'])
+        self._check(p, '1949-12-31', [])
