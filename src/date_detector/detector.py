@@ -12,12 +12,16 @@ FORMATS_WITH_MDY = ['%Y/%m/%d', '%y/%m/%d', '%m/%d/%Y', '%m/%d/%y']
 DEFAULT_MIN_DATE = date(1950, 1, 1)
 DEFAULT_MAX_DATE = date(2049, 12, 31)
 
+# A date match found by the parser
 Match = namedtuple('Match', 'date offset text')
 
+# A dictionary entry
 Entry = namedtuple('Entry', 'year month day token')
 
+# A match candidate
 Candidate = namedtuple('Candidate', 'year month day')
 
+# A token returned by the Tokenizer
 Token = namedtuple('Token', 'start end type')
 
 
@@ -119,6 +123,14 @@ class Parser(object):
 
     def __init__(self, dictionaries=('en',), month_before_day=False,
                  min_date=DEFAULT_MIN_DATE, max_date=DEFAULT_MAX_DATE, tokenizer_class=Tokenizer):
+        '''
+        Initializer.
+        - dictionaries: language codes of dictionaries to use (default: "en").
+        - month_before_day: whether to prefer M/D/Y dates (American) over D/M/Y (default: False).
+        - min_date: the minimal date to consider (default: 1950-01-01).
+        - max_date: the maximal date to consider (default: 2049-12-31).
+        - tokenizer_class: the class to use for tokenizing text (default: Tokenizer)
+        '''
         self.month_before_day = month_before_day
         self.min_date = min_date
         self.max_date = max_date
@@ -129,6 +141,10 @@ class Parser(object):
             self._load_dictionary(d)
 
     def parse(self, text):
+        '''
+        Looks for dates in the given text.
+        Returns a generator of Match instances.
+        '''
         seq = Sequence(text)
         for token in self.tokenizer.tokenize(text):
             # Look for the token text in the dictionaries
@@ -172,9 +188,12 @@ class Parser(object):
         return token_text
 
     def _build_matches(self, seq):
+        '''
+        Returns a set of Match instances from the given Sequence.
+        '''
         matches = set()
         if seq.is_full():
-            candidates = self._digits_candidates(seq) if seq.is_all_digits() else self._mixed_candidates(seq)
+            candidates = self._numeric_candidates(seq) if seq.is_all_digits() else self._alphanumeric_candidates(seq)
             for candidate in candidates:
                 try:
                     d = date(*candidate)
@@ -183,7 +202,10 @@ class Parser(object):
                     pass
         return matches
 
-    def _digits_candidates(self, seq):
+    def _numeric_candidates(self, seq):
+        '''
+        Parses a Sequence of numeric tokens into a list of match candidates.
+        '''
         text = repr(seq)
         formats = FORMATS_WITH_MDY if self.month_before_day else FORMATS_WITH_DMY
         candidates = []
@@ -196,13 +218,20 @@ class Parser(object):
                 pass
         return candidates
 
-    def _mixed_candidates(self, seq):
+    def _alphanumeric_candidates(self, seq):
+        '''
+        Parses a Sequence of alphanumeric tokens into a list of match candidates.
+        '''
         candidates = [Candidate(None, None, None)]
         for entry in seq:
             candidates = self._extend(candidates, entry)
         return candidates
 
     def _extend(self, candidates, entry):
+        '''
+        Given a list of candidates and a dictionary entry, this method returns a list of
+        new cadidates with the additional information provided by the entry.
+        '''
         new_candidates = []
         if entry.year:
             # Create new candidates by filling their year field
@@ -215,21 +244,13 @@ class Parser(object):
             new_candidates.extend([Candidate(c.year, c.month, entry.day) for c in candidates if not c.day])
         return new_candidates
 
-    def _add_to_dictionary(self, token, year=None, month=None, day=None):
-        token = token.lower()
-        old_entry = self.entries.get(token)
-        if old_entry:
-            entry = Entry(
-                year or old_entry.year,
-                month or old_entry.month,
-                day or old_entry.day,
-                token
-            )
-        else:
-            entry = Entry(year, month, day, token)
-        self.entries[token] = entry
-
     def _build_default_dictionary(self):
+        '''
+        Fill the entities dictionary with default entities:
+        - whitespace tokens
+        - punctuation tokens
+        - numeric tokens for years, months and days
+        '''
         # Valueless tokens and whitespace
         for token in ',./\\-':
             self._add_to_dictionary(token)
@@ -251,6 +272,9 @@ class Parser(object):
                 self._add_to_dictionary('0' + str(day), day=day)
 
     def _load_dictionary(self, name):
+        '''
+        Load an entities dictionary by its name (language code).
+        '''
         from pkgutil import get_data
         text = get_data('date_detector', 'dictionaries/%s.txt' % name)
         for line in text.decode('utf-8').splitlines():
@@ -259,10 +283,37 @@ class Parser(object):
                 continue
             parts = line.split()
             if len(parts) != 4:
-                raise ValueError('Invalid line in %s dictionary: "%s"' % line)
+                raise ValueError('Invalid line in %s dictionary: "%s"' % (name, line))
             self._add_to_dictionary(
                 parts[0],
                 None if parts[1] == '-' else int(parts[1]),
                 None if parts[2] == '-' else int(parts[2]),
                 None if parts[3] == '-' else int(parts[3])
             )
+
+    def _add_to_dictionary(self, token_text, year=None, month=None, day=None):
+        '''
+        Add a token to the entities dictionary. In case a token already
+        exists, their entities are merged into one entry.
+        - token_text: the token string
+        - year: the token's year value, or None
+        - month: the token's month value, or None
+        - day: the token's day value, or None
+        '''
+        self._validate_token(token_text)
+        token_text = token_text.lower()
+        old_entry = self.entries.get(token_text)
+        if old_entry:
+            entry = Entry(
+                year or old_entry.year,
+                month or old_entry.month,
+                day or old_entry.day,
+                token_text
+            )
+        else:
+            entry = Entry(year, month, day, token_text)
+        self.entries[token_text] = entry
+
+    def _validate_token(self, token_text):
+        n = sum(1 for t in self.tokenizer.tokenize(token_text))
+        assert n == 1, 'The token "%s" is made up of %d sub-tokens' % (token_text, n)
