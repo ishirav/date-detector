@@ -1,11 +1,11 @@
-__version__ = "1.0.1"
+__version__ = "1.0.1.post1"
 __git_commiter_name__ = "Itai Shirav"
-__git_commiter_email__ = "itais@infinidat.com"
-__git_branch__ = u'(HEAD detached at v1.0.1)'
-__git_remote_tracking_branch__ = '(No remote tracking)'
-__git_remote_url__ = '(Not remote tracking)'
-__git_head_hash__ = 'f4da4d480e7893cdee43805d10015b0d4d9b12cf'
-__git_head_subject__ = u'Finished Release v1.0'
+__git_commiter_email__ = "ishirav@gmail.com"
+__git_branch__ = u'develop'
+__git_remote_tracking_branch__ = u'origin/develop'
+__git_remote_url__ = u'git@github.com:ishirav/date-detector.git'
+__git_head_hash__ = '0fc0b5ae4452ea4873a917f702d9c531884f1f81'
+__git_head_subject__ = u'ver'
 __git_head_message__ = u''
-__git_dirty_diff__ = u''
-__git_commit_date__ = '2017-12-29 18:30:49'
+__git_dirty_diff__ = u'diff --git a/buildout.cfg b/buildout.cfg\nindex 0ebeeee..3e5530d 100644\n--- a/buildout.cfg\n+++ b/buildout.cfg\n@@ -4,7 +4,7 @@ newest = false\n extensions = buildout.wheel\n download-cache = .cache\n develop = .\n-parts = \n+parts =\n \n [project]\n name = date-detector\n@@ -12,7 +12,6 @@ company = Infinidat\n namespace_packages = []\n install_requires = [\n \t\'setuptools\',\n-\t\'six\'\n \t]\n version_file = src/date_detector/__version__.py\n description = A Python module for scanning text and extracting dates from it\n@@ -27,7 +26,7 @@ pre_uninstall_script_name = None\n \n [isolated-python]\n recipe = infi.recipe.python\n-version = v2.7.8.8\n+version = v2.7.12.4\n \n [setup.py]\n recipe = infi.recipe.template.version\ndiff --git a/src/date_detector/__version__.py b/src/date_detector/__version__.py\nindex 1b637d3..0553858 100644\n--- a/src/date_detector/__version__.py\n+++ b/src/date_detector/__version__.py\n@@ -1,11 +1,11 @@\n-__version__ = "1.0.1"\n+__version__ = "1.0.1.post1"\n __git_commiter_name__ = "Itai Shirav"\n __git_commiter_email__ = "itais@infinidat.com"\n-__git_branch__ = u\'(HEAD detached at v1.0.1)\'\n-__git_remote_tracking_branch__ = \'(No remote tracking)\'\n-__git_remote_url__ = \'(Not remote tracking)\'\n-__git_head_hash__ = \'f4da4d480e7893cdee43805d10015b0d4d9b12cf\'\n-__git_head_subject__ = u\'Finished Release v1.0\'\n+__git_branch__ = u\'develop\'\n+__git_remote_tracking_branch__ = u\'origin/develop\'\n+__git_remote_url__ = u\'git@github.com:ishirav/date-detector.git\'\n+__git_head_hash__ = \'0fc0b5ae4452ea4873a917f702d9c531884f1f81\'\n+__git_head_subject__ = u\'ver\'\n __git_head_message__ = u\'\'\n __git_dirty_diff__ = u\'\'\n-__git_commit_date__ = \'2017-12-29 18:30:49\'\n+__git_commit_date__ = \'2017-12-29 18:36:55\'\n'
+__git_commit_date__ = '2017-12-29 18:36:55'
