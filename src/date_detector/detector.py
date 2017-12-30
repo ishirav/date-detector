@@ -41,7 +41,7 @@ class Tokenizer(object):
     OTHER       = 'O'
 
     # Characters that are considered whitespace
-    WHITESPACE_CHARS = ' \t\n\r'.encode('ascii')
+    WHITESPACE_CHARS = ' \t\n\r'
 
     def tokenize(self, text):
         '''

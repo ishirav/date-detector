@@ -29,6 +29,8 @@ Similar projects
 ----------------
 * datefinder (https://github.com/akoumjian/datefinder)
 * dateparser (https://github.com/scrapinghub/dateparser)
+* date-extractor (https://github.com/DanielJDufour/date-extractor)
+* parsedatetime (https://github.com/bear/parsedatetime)
 * python-natty (https://github.com/eadmundo/python-natty)
 
 Usage
